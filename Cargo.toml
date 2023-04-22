@@ -1,8 +1,14 @@
 [package]
 name = "dyncast"
 version = "0.0.1"
+description = "Downcasting made easy"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT OR Apache-2.0"
+rust-version = "1.62"
 
 [dependencies]
+dyncast-impl = { path = "./impl"}
+once_cell = "1.17.1"
+
+[workspace]
+members = ["impl"]
