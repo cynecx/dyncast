@@ -1,3 +1,4 @@
+// From the `linkme` crate:
 // https://github.com/dtolnay/async-trait/blob/49cdc5f276980e667e4aac0840ae302ccc1308f1/src/parse.rs
 
 use proc_macro2::{Span, TokenStream};

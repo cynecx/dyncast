@@ -1,5 +1,5 @@
-// From the `dyncst` create:
-// https://github.com/dtolnay/dyncst/blob/b841bae328e844b4ff7f9a8d571df771fbecfc18/impl/src/linker.rs
+// From the `linkme` crate:
+// https://github.com/dtolnay/linkme/blob/b841bae328e844b4ff7f9a8d571df771fbecfc18/impl/src/linker.rs
 
 pub mod linux {
     use std::fmt::Display;

@@ -1,4 +1,4 @@
-// From the `linkme` create:
+// From the `linkme` crate:
 // https://github.com/dtolnay/linkme/blob/b841bae328e844b4ff7f9a8d571df771fbecfc18/impl/src/hash.rs
 
 use std::collections::hash_map;
