@@ -41,9 +41,6 @@ fn boba() {
     let a = &a as &dyn Any;
     let b = &b as &dyn Any;
 
-    // a.dyncast_to::<dyn Boba>().unwrap().supper();
-    // b.dyncast_to::<dyn Boba>().unwrap().supper();
-
     assert!(a.dyncast_to::<dyn Boba>().is_some());
     assert!(b.dyncast_to::<dyn Boba>().is_some());
 

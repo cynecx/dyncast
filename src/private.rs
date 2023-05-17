@@ -1,30 +1,52 @@
-use std::any::TypeId;
+pub use std::any::TypeId;
 
 pub use crate::map::LazyTypeMap;
 pub use crate::Dyncast;
 
-#[derive(Copy, Clone)]
-pub struct Descriptor<T: ?Sized> {
-    type_id: TypeId,
-    attach_vtable: unsafe fn(*const ()) -> *const T,
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Key {
+    pub self_type_id: TypeId,
+    pub generics_type_id: Option<TypeId>,
 }
 
-impl<T: ?Sized> Descriptor<T> {
+#[derive(Copy, Clone)]
+pub struct Descriptor {
+    pub(crate) self_type_id: TypeId,
+    pub(crate) generics_type_id: Option<TypeId>,
+    attach_vtable: *const (),
+}
+
+unsafe impl Send for Descriptor {}
+unsafe impl Sync for Descriptor {}
+
+impl Descriptor {
     #[inline]
-    pub unsafe fn new(type_id: TypeId, attach_vtable: unsafe fn(*const ()) -> *const T) -> Self {
+    pub unsafe fn new<T: ?Sized>(
+        self_type_id: TypeId,
+        attach_vtable: unsafe fn(*const ()) -> *const T,
+    ) -> Self {
         Self {
-            type_id,
-            attach_vtable,
+            self_type_id,
+            generics_type_id: None,
+            attach_vtable: attach_vtable as *const (),
         }
     }
 
     #[inline]
-    pub fn ty_id(&self) -> TypeId {
-        self.type_id
+    pub unsafe fn new_generics<T: ?Sized>(
+        self_type_id: TypeId,
+        generics_type_id: TypeId,
+        attach_vtable: unsafe fn(*const ()) -> *const T,
+    ) -> Self {
+        Self {
+            self_type_id,
+            generics_type_id: Some(generics_type_id),
+            attach_vtable: attach_vtable as *const (),
+        }
     }
 
     #[inline]
-    pub fn attach_vtable(&self) -> unsafe fn(*const ()) -> *const T {
-        self.attach_vtable
+    pub unsafe fn attach_vtable<T: ?Sized>(&self) -> unsafe fn(*const ()) -> *const T {
+        std::mem::transmute(self.attach_vtable)
     }
 }

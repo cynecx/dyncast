@@ -1,6 +1,7 @@
-/// Basically a reimplementation of std's `Once` but in this case we control the implementation and
-/// therefore can make stronger gurantees about the valid memory representation of our `Once`.
-/// It is important that our `Once` can be "zero-initialized'.
+//! Basically a reimplementation of std's `Once` but in this case we control the implementation and
+//! therefore can make stronger guarantees about the valid memory representation of our `Once`.
+//! It is important that our `Once` can be "zero-initialized'.
+
 use std::{
     cell::UnsafeCell,
     panic::{self, AssertUnwindSafe},
@@ -22,7 +23,6 @@ unsafe impl Sync for Once {}
 unsafe impl Zeroable for Once {}
 
 impl Once {
-    #[allow(dead_code)]
     pub const fn new() -> Self {
         Self {
             state: AtomicPtr::new(STATE_INIT_PTR),
@@ -54,7 +54,7 @@ impl Once {
                     Ordering::Acquire,
                 ) {
                     Ok(_) => {
-                        let res = panic::catch_unwind(AssertUnwindSafe(|| f()));
+                        let res = panic::catch_unwind(AssertUnwindSafe(f));
                         let final_state = if res.is_ok() {
                             STATE_COMPLETED_PTR
                         } else {
@@ -147,6 +147,7 @@ impl Packed {
         Self(ptr)
     }
 
+    #[inline(always)]
     fn load_acquire(state: &AtomicPtr<Waiter>) -> Self {
         Self(state.load(Ordering::Acquire))
     }

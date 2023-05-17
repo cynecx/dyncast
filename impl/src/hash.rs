@@ -11,9 +11,12 @@ use std::hash::{Hash, Hasher};
 // linkme-specific prefix.
 pub struct Symbol(u64);
 
-pub fn hash(ident: impl Hash) -> Symbol {
+pub fn hash(ident: impl Hash, seed: Option<u64>) -> Symbol {
     let mut hasher = hash_map::DefaultHasher::new();
     ident.hash(&mut hasher);
+    if let Some(seed) = seed {
+        seed.hash(&mut hasher);
+    }
     Symbol(hasher.finish())
 }
 
@@ -40,5 +43,5 @@ impl Display for Symbol {
 #[test]
 fn test_hash() {
     let ident = Ident::new("EXAMPLE", proc_macro2::Span::call_site());
-    assert_eq!(hash(&ident).to_string(), "0GPSzIoo");
+    assert_eq!(hash(&ident, None).to_string(), "0GPSzIoo");
 }
