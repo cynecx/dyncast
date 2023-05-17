@@ -2,6 +2,8 @@
 
 Proof of concept.
 
+**Fair warning**: The soundness of this approach has not been validated.
+
 ```rust
 use std::any::Any;
 
