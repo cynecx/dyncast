@@ -30,6 +30,9 @@ impl Boba for B {
 #[dyncast]
 trait Soba {}
 
+#[dyncast]
+impl Soba for B {}
+
 #[test]
 fn boba() {
     let a = A;
@@ -45,5 +48,5 @@ fn boba() {
     assert!(b.dyncast_to::<dyn Boba>().is_some());
 
     assert!(a.dyncast_to::<dyn Soba>().is_none());
-    assert!(b.dyncast_to::<dyn Soba>().is_none());
+    assert!(b.dyncast_to::<dyn Soba>().is_some());
 }

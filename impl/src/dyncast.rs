@@ -102,7 +102,7 @@ pub fn expand_trait(item: &mut ItemTrait, _args: Args) -> Result<TokenStream, Er
     let macho_section_stop = linker::macho::section_stop(trait_ident);
 
     let dyncast_descriptor_ref = quote! {
-        fn __dyncast_descriptor_ref()
+        unsafe fn __dyncast_descriptor_ref()
         where
             Self: 'static + ::std::marker::Sized + #dyncast_provider
         {
@@ -201,7 +201,7 @@ pub fn expand_impl(item: &ItemImpl, _args: Args) -> Result<TokenStream, Error> {
     Ok(quote! {
         const _: () = {
             #[used]
-            static REF_DYNCAST: fn() = <#self_ty as #trait_path>::__dyncast_descriptor_ref;
+            static REF_DYNCAST: unsafe fn() = <#self_ty as #trait_path>::__dyncast_descriptor_ref;
         };
     })
 }
