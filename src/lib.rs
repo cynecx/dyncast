@@ -7,6 +7,9 @@ pub use dyncast_impl::dyncast;
 #[doc(hidden)]
 pub mod private;
 
+mod map;
+mod once;
+
 pub trait Dyncast: Any {
     fn dyncast_from<T: ?Sized + Any>(source: &T) -> Option<&Self>;
 }

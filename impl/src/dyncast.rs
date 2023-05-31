@@ -164,18 +164,11 @@ pub fn expand_trait(item: &mut ItemTrait, _args: Args) -> Result<TokenStream, Er
                     static DYNCAST_STOP: *const ();
                 }
 
-                static MAP: ::dyncast::private::TypeMap<dyn #trait_ident> = ::dyncast::private::TypeMap::new(
-                    || unsafe {
-                        ::dyncast::private::descriptors(&DYNCAST_START, &DYNCAST_STOP)
-                            .map(|entry| {
-                                let descriptor = (entry)();
-                                (descriptor.ty_id(), descriptor)
-                            })
-                            .collect()
-                    }
-                );
+                let lazy = ::dyncast::private::LazyTypeMap::<dyn #trait_ident>::current();
+                let map = unsafe { lazy.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
 
-                let descriptor = MAP.get(&source.type_id())?;
+                let descriptor = map.get(&source.type_id())?;
+
                 Some(unsafe {
                     &*(descriptor.attach_vtable())(source as *const T as *const ())
                 })
