@@ -41,7 +41,7 @@ pub trait Dyncast: Any {
     fn dyncast_from<T: ?Sized + Any>(source: &T) -> Option<&Self>;
 }
 
-/// Provides a shorthand method [dyncast_to](`DyncastExt::dyncast_to`).
+/// Provides a shorthand method [`dyncast_to`](`DyncastExt::dyncast_to`).
 ///
 /// ```
 /// use dyncast::{dyncast, DyncastExt};

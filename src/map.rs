@@ -46,6 +46,8 @@ impl<T: ?Sized + Any> LazyTypeMap<T> {
         }
     }
 
+    /// # Safety
+    /// This is an internal api used by the proc-macro generated code.
     pub unsafe fn current() -> &'static Self {
         unsafe { crate::generic_statics::generic_static() }
     }
@@ -110,16 +112,20 @@ impl<'a> InitializedTypeMap<'a> {
 }
 
 unsafe fn descriptors(
-    mut start: *const *const (),
+    start: *const *const (),
     end: *const *const (),
 ) -> impl Iterator<Item = Option<fn() -> Descriptor>> {
-    iter::from_fn(move || loop {
-        if start == end {
+    assert!(start <= end);
+
+    let mut curr = start;
+
+    iter::from_fn(move || {
+        if curr == end {
             return None;
         }
 
-        let entry = unsafe { *start };
-        start = start.add(1);
+        let entry = unsafe { *curr };
+        curr = curr.add(1);
 
         let item = if entry.is_null() {
             None
@@ -127,7 +133,7 @@ unsafe fn descriptors(
             Some(unsafe { mem::transmute::<*const (), fn() -> Descriptor>(entry) })
         };
 
-        return Some(item);
+        Some(item)
     })
 }
 

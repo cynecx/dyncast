@@ -11,6 +11,7 @@ use crate::{
     parse::Item,
 };
 
+#[derive(Debug, Clone, Copy)]
 enum AsmSectionKind {
     DyncastDescriptorSymbol,
     ZeroData,
@@ -143,7 +144,7 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
 
     let has_generics = !item.generics.params.is_empty();
 
-    let inner_trait_ident = Ident::new(&format!("Inner{}", trait_ident), Span::call_site());
+    let inner_trait_ident = Ident::new(&format!("Inner{trait_ident}"), Span::call_site());
 
     let dyncast_provider = format!("{}DyncastProvider", &item.ident);
     let dyncast_provider = Ident::new(
@@ -220,6 +221,7 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
     };
 
     let dyncast_descriptor_ref = quote! {
+        #[doc(hidden)]
         unsafe fn __dyncast_descriptor_ref()
         where
             Self: 'static + ::std::marker::Sized + #dyncast_provider_with_params
@@ -232,6 +234,7 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
     item.items.push(dyncast_descriptor_ref);
 
     Ok(quote! {
+        #[doc(hidden)]
         unsafe trait #dyncast_provider #generics_lt #generics_params #generics_gt : #trait_ident_with_params
         #generics_where
         {
