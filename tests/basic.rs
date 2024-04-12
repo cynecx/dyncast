@@ -1,20 +1,18 @@
-#![feature(ptr_metadata)]
-
 use std::any::Any;
 
 use dyncast::{dyncast, DyncastExt};
 
-#[dyncast]
+#[dyncast(global_id = "basic::Boba")]
 trait Boba {
-    fn supper(&self);
+    fn supper(&self) -> &'static str;
 }
 
 struct A;
 
 #[dyncast]
 impl Boba for A {
-    fn supper(&self) {
-        println!("a")
+    fn supper(&self) -> &'static str {
+        "a"
     }
 }
 
@@ -22,12 +20,12 @@ struct B;
 
 #[dyncast]
 impl Boba for B {
-    fn supper(&self) {
-        println!("b")
+    fn supper(&self) -> &'static str {
+        "b"
     }
 }
 
-#[dyncast]
+#[dyncast(global_id = "basic::Soba")]
 trait Soba {}
 
 #[dyncast]
@@ -42,7 +40,10 @@ fn boba() {
     let b = &b as &dyn Any;
 
     assert!(a.dyncast_to::<dyn Boba>().is_some());
+    assert_eq!(a.dyncast_to::<dyn Boba>().unwrap().supper(), "a");
+
     assert!(b.dyncast_to::<dyn Boba>().is_some());
+    assert_eq!(b.dyncast_to::<dyn Boba>().unwrap().supper(), "b");
 
     assert!(a.dyncast_to::<dyn Soba>().is_none());
     assert!(b.dyncast_to::<dyn Soba>().is_some());

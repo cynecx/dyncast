@@ -1,15 +1,11 @@
-#![feature(ptr_metadata)]
-
 use std::any::Any;
 
 /// [This](`dyncast`) proc-macro can be used on trait definitions and trait impls.
 ///
 /// ```
-/// # #![feature(ptr_metadata)]
-///
 /// use dyncast::dyncast;
 ///
-/// #[dyncast]
+/// #[dyncast(global_id = "test1::Foo")]
 /// trait Foo {}
 ///
 /// #[dyncast]
@@ -21,11 +17,9 @@ use std::any::Any;
 /// [`dyncast`] also supports traits with generics. However, this is limited type parameters.
 ///
 /// ```
-/// # #![feature(ptr_metadata)]
-///
 /// use dyncast::dyncast;
 ///
-/// #[dyncast]
+/// #[dyncast(global_id = "test2::Foo")]
 /// trait Foo<T: 'static> {}
 ///
 /// #[dyncast]
@@ -38,8 +32,10 @@ pub use dyncast_impl::dyncast;
 #[doc(hidden)]
 pub mod private;
 
+mod generic_statics;
 mod map;
 mod once;
+mod ptr;
 
 pub trait Dyncast: Any {
     fn dyncast_from<T: ?Sized + Any>(source: &T) -> Option<&Self>;
@@ -48,11 +44,9 @@ pub trait Dyncast: Any {
 /// Provides a shorthand method [dyncast_to](`DyncastExt::dyncast_to`).
 ///
 /// ```
-/// # #![feature(ptr_metadata)]
-///
 /// use dyncast::{dyncast, DyncastExt};
 ///
-/// #[dyncast]
+/// #[dyncast(global_id = "universe::Bar")]
 /// trait Bar {}
 ///
 /// fn foo(val: &dyn std::any::Any) {

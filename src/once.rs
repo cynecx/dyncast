@@ -11,7 +11,6 @@ use std::{
 };
 
 use sptr::Strict;
-use static_generics::Zeroable;
 
 pub struct Once {
     state: AtomicPtr<Waiter>,
@@ -19,8 +18,6 @@ pub struct Once {
 
 unsafe impl Send for Once {}
 unsafe impl Sync for Once {}
-
-unsafe impl Zeroable for Once {}
 
 impl Once {
     pub const fn new() -> Self {
@@ -115,6 +112,13 @@ impl Once {
 
             unreachable!("invalid state");
         }
+    }
+}
+
+impl Default for Once {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 

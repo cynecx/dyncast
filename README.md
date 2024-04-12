@@ -9,7 +9,7 @@ use std::any::Any;
 
 use dyncast::{dyncast, DyncastExt};
 
-#[dyncast]
+#[dyncast(global_id = "universe::Boba")]
 trait Boba {
     fn supper(&self);
 }
@@ -32,7 +32,7 @@ impl Boba for B {
     }
 }
 
-#[dyncast]
+#[dyncast(global_id = "universe::Soba")]
 trait Soba {}
 
 #[test]

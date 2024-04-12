@@ -1,10 +1,8 @@
-#![feature(ptr_metadata)]
-
 use std::any::Any;
 
 use dyncast::{dyncast, DyncastExt};
 
-#[dyncast]
+#[dyncast(global_id = "generics::Boba")]
 trait Boba<A: 'static> {
     fn supper(&self);
 }
@@ -34,7 +32,7 @@ impl Boba<String> for B {
     }
 }
 
-#[dyncast]
+#[dyncast(global_id = "generics::Soba")]
 trait Soba {}
 
 #[dyncast]
@@ -60,4 +58,39 @@ fn boba() {
     assert!(b.dyncast_to::<dyn Boba<String>>().is_some());
     assert!(b.dyncast_to::<dyn Boba<Box<usize>>>().is_none());
     assert!(b.dyncast_to::<dyn Soba>().is_some());
+}
+
+#[dyncast(global_id = "generics::Convert")]
+trait Convert<To> {
+    fn convert_to(&self) -> To;
+}
+
+struct Conv(usize);
+
+#[dyncast]
+impl Convert<String> for Conv {
+    fn convert_to(&self) -> String {
+        format!("{}", self.0)
+    }
+}
+
+#[dyncast]
+impl Convert<usize> for Conv {
+    fn convert_to(&self) -> usize {
+        self.0
+    }
+}
+
+#[test]
+fn convert() {
+    let p = Box::new(Conv(1337)) as Box<dyn Any>;
+    let p = &*p;
+    assert_eq!(
+        p.dyncast_to::<dyn Convert<usize>>().unwrap().convert_to(),
+        1337
+    );
+    assert_eq!(
+        p.dyncast_to::<dyn Convert<String>>().unwrap().convert_to(),
+        "1337"
+    );
 }

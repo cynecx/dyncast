@@ -5,7 +5,11 @@ use syn::{
     TraitItem, WherePredicate,
 };
 
-use crate::{args::Args, linker, parse::Item};
+use crate::{
+    args::Args,
+    linker::{self, SectionNameArgs},
+    parse::Item,
+};
 
 enum AsmSectionKind {
     DyncastDescriptorSymbol,
@@ -13,13 +17,12 @@ enum AsmSectionKind {
 }
 
 fn generate_asm_sections(
-    args: &Args,
-    trait_ident: &Ident,
+    section_name_args: SectionNameArgs<'_>,
     kind: AsmSectionKind,
     is_global: bool,
 ) -> TokenStream {
-    let elf_section = linker::elf::section(trait_ident, args.seed);
-    let macho_section = linker::macho::section(trait_ident, args.seed);
+    let elf_section = linker::elf::section(section_name_args);
+    let macho_section = linker::macho::section(section_name_args);
 
     let push_elf_section = format!(".pushsection {elf_section}");
     let push_macho_section = format!(".pushsection {macho_section}");
@@ -92,6 +95,10 @@ fn extract_generic_type_params_idents(generics: &Generics) -> TokenStream {
 }
 
 pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Error> {
+    let Some(global_id) = &args.global_id else {
+        return Err(Error::new(args.end_span, "global_id must be set"));
+    };
+
     if let Some(first_const_param) = item.generics.const_params().next() {
         return Err(Error::new(
             first_const_param.span(),
@@ -146,30 +153,35 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
     let dyncast_provider_with_params =
         quote!(#dyncast_provider #generics_lt #generics_params_pass #generics_gt);
 
+    let section_name_args = SectionNameArgs {
+        name: trait_ident,
+        global_id,
+        seed: args.seed,
+    };
+
     let descriptor_entry = generate_asm_sections(
-        &args,
-        trait_ident,
+        section_name_args,
         AsmSectionKind::DyncastDescriptorSymbol,
         false,
     );
     let empty_descriptor_entry =
-        generate_asm_sections(&args, trait_ident, AsmSectionKind::ZeroData, true);
+        generate_asm_sections(section_name_args, AsmSectionKind::ZeroData, true);
 
-    let elf_section_start = linker::elf::section_start(trait_ident, args.seed);
-    let elf_section_stop = linker::elf::section_stop(trait_ident, args.seed);
+    let elf_section_start = linker::elf::section_start(section_name_args);
+    let elf_section_stop = linker::elf::section_stop(section_name_args);
 
-    let macho_section_start = linker::macho::section_start(trait_ident, args.seed);
-    let macho_section_stop = linker::macho::section_stop(trait_ident, args.seed);
+    let macho_section_start = linker::macho::section_start(section_name_args);
+    let macho_section_stop = linker::macho::section_stop(section_name_args);
 
     let generics_type_id = if has_generics {
         quote! {
-            let generics_type_id = Some(
+            let __generics_type_id = Some(
                 ::dyncast::private::TypeId::of::<(#generics_params_pass)>()
             );
         }
     } else {
         quote! {
-            let generics_type_id = None;
+            let __generics_type_id = None;
         }
     };
 
@@ -193,15 +205,17 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
     let make_map = if has_generics {
         quote! {
             trait #inner_trait_ident: 'static {}
-            let lazy = ::dyncast::private::LazyTypeMap::<dyn #inner_trait_ident>::current();
-            let map = unsafe { lazy.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
+            let __lazy = unsafe {
+                ::dyncast::private::LazyTypeMap::<dyn #inner_trait_ident>::current()
+            };
+            let __map = unsafe { __lazy.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
         }
     } else {
         quote! {
             trait #inner_trait_ident: 'static {}
-            static LAZY_MAP: ::dyncast::private::LazyTypeMap::<dyn #inner_trait_ident> =
+            static __LAZY_MAP: ::dyncast::private::LazyTypeMap::<dyn #inner_trait_ident> =
                 ::dyncast::private::LazyTypeMap::new();
-            let map = unsafe { LAZY_MAP.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
+            let __map = unsafe { __LAZY_MAP.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
         }
     };
 
@@ -235,10 +249,12 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
             where
                 Self: 'static + ::std::marker::Sized,
             {
-                let vtable = ::std::ptr::metadata(
-                    ::std::ptr::null::<Self>() as *const dyn #trait_ident_with_params
-                );
-                ::std::ptr::from_raw_parts(ptr, vtable)
+                unsafe {
+                    let vtable = ::dyncast::private::ptr::metadata(
+                        ::std::ptr::null::<Self>() as *const dyn #trait_ident_with_params
+                    );
+                    ::dyncast::private::ptr::from_raw_parts(ptr, vtable)
+                }
             }
         }
 
@@ -252,7 +268,7 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
         #generics_where
         {
             fn dyncast_from<__T: ?::std::marker::Sized + ::std::any::Any>(
-                source: &__T
+                __source: &__T
             ) -> ::std::option::Option<&Self> {
                 use ::std::any::Any;
 
@@ -278,14 +294,14 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
 
                 #make_map
 
-                let key = ::dyncast::private::Key {
-                    self_type_id: source.type_id(),
-                    generics_type_id,
+                let __key = ::dyncast::private::Key {
+                    self_type_id: __source.type_id(),
+                    generics_type_id: __generics_type_id,
                 };
-                let descriptor = map.get(&key)?;
+                let __descriptor = __map.get(&__key)?;
 
                 Some(unsafe {
-                    &*(descriptor.attach_vtable())(source as *const _ as *const ())
+                    &*(__descriptor.attach_vtable_fn())(__source as *const _ as *const ())
                 })
             }
         }

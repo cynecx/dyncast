@@ -4,11 +4,10 @@ version = "0.1.0"
 description = "Downcasting made easy"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-rust-version = "1.62"
+rust-version = "1.74"
 
 [dependencies]
 sptr = "0.3.2"
-static-generics = "0.1.0"
 
 dyncast-impl = { version = "=0.1.0", path = "./impl" }
 
