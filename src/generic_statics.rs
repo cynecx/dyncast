@@ -1,4 +1,6 @@
 //! Specialized form of [generic-statics](https://github.com/cynecx/generic-statics/).
+//! The static allocation for each generic static instantiation is hardcoded
+//! (64 bytes blocks with 16 byte alignment).
 
 use std::{any::TypeId, marker::PhantomData};
 
@@ -117,7 +119,7 @@ pub unsafe fn generic_static<T: 'static>() -> &'static T {
     }
 
     // In case this is run on targets we don't really support.
-    assert!(!addr.is_null());
+    assert!(!addr.is_null(), "unsupported platform");
 
     unsafe { &*addr.cast::<T>() }
 }

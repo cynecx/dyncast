@@ -2,7 +2,7 @@ use std::any::Any;
 
 use dyncast::{dyncast, DyncastExt};
 
-#[dyncast(global_id = "generics::Boba")]
+#[dyncast]
 trait Boba<A: 'static> {
     fn supper(&self);
 }
@@ -32,7 +32,7 @@ impl Boba<String> for B {
     }
 }
 
-#[dyncast(global_id = "generics::Soba")]
+#[dyncast]
 trait Soba {}
 
 #[dyncast]
@@ -60,7 +60,7 @@ fn boba() {
     assert!(b.dyncast_to::<dyn Soba>().is_some());
 }
 
-#[dyncast(global_id = "generics::Convert")]
+#[dyncast]
 trait Convert<To> {
     fn convert_to(&self) -> To;
 }

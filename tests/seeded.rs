@@ -2,7 +2,7 @@ use std::any::Any;
 
 use dyncast::{dyncast, DyncastExt};
 
-#[dyncast(global_id = "seeded::Boba", seed = 1337)]
+#[dyncast]
 trait Boba {
     fn supper(&self) -> &'static str;
 }

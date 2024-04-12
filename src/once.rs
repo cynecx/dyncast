@@ -26,6 +26,7 @@ impl Once {
         }
     }
 
+    #[inline]
     pub fn call_once<R, F: FnOnce() -> R>(&self, f: F) -> Option<R> {
         let packed = Packed::load_acquire(&self.state);
         if packed.is_completed() {
@@ -92,7 +93,7 @@ impl Once {
 
                 if let Err(prev) = self.state.compare_exchange(
                     packed.into_inner(),
-                    Packed::new_waiting(Some(&waiter as *const _)).into_inner(),
+                    Packed::new_waiting(Some(std::ptr::addr_of!(waiter))).into_inner(),
                     Ordering::AcqRel,
                     Ordering::Acquire,
                 ) {
