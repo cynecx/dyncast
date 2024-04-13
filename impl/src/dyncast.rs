@@ -5,84 +5,7 @@ use syn::{
     TraitItem, WherePredicate,
 };
 
-use crate::{
-    args::Args,
-    linker::{self, SectionNameArgs},
-    parse::Item,
-};
-
-#[derive(Debug, Clone, Copy)]
-enum AsmSectionKind {
-    DyncastDescriptorSymbol,
-    ZeroData,
-}
-
-fn generate_asm_sections(
-    section_name_args: SectionNameArgs<'_>,
-    kind: AsmSectionKind,
-    is_global: bool,
-) -> TokenStream {
-    let elf_section = linker::elf::section(section_name_args);
-    let macho_section = linker::macho::section(section_name_args);
-
-    let push_elf_section = format!(".pushsection {elf_section}");
-    let push_macho_section = format!(".pushsection {macho_section}");
-
-    let (data_32, data_64, bindings, options) = match kind {
-        AsmSectionKind::DyncastDescriptorSymbol => (
-            ".long {data}",
-            ".quad {data}",
-            quote!(data = sym Self::dyncast_descriptor,),
-            quote!(nomem, preserves_flags, nostack),
-        ),
-        AsmSectionKind::ZeroData => (".long 0", ".quad 0", quote!(), quote!()),
-    };
-
-    let asm_kind = if is_global {
-        quote!(::std::arch::global_asm!)
-    } else {
-        quote!(::std::arch::asm!)
-    };
-
-    quote! {
-        #[cfg(all(any(target_os = "macos", target_os = "ios", target_os = "tvos"), target_pointer_width = "64"))]
-        #asm_kind(
-            #push_macho_section,
-            ".p2align 3, 0",
-            #data_64,
-            ".popsection",
-            #bindings
-            options(#options)
-        );
-        #[cfg(all(any(target_os = "macos", target_os = "ios", target_os = "tvos"), target_pointer_width = "32"))]
-        #asm_kind(
-            #push_macho_section,
-            ".p2align 2, 0",
-            #data_32,
-            ".popsection",
-            #bindings
-            options(#options)
-        );
-        #[cfg(all(any(target_os = "none", target_os = "linux", target_os = "freebsd"), target_pointer_width = "64"))]
-        #asm_kind(
-            #push_elf_section,
-            ".p2align 3, 0",
-            #data_64,
-            ".popsection",
-            #bindings
-            options(#options)
-        );
-        #[cfg(all(any(target_os = "none", target_os = "linux", target_os = "freebsd"), target_pointer_width = "32"))]
-        #asm_kind(
-            #push_elf_section,
-            ".p2align 2, 0",
-            #data_32,
-            ".popsection",
-            #bindings
-            options(#options)
-        );
-    }
-}
+use crate::{args::Args, linker, parse::Item};
 
 fn extract_generic_type_params_idents(generics: &Generics) -> TokenStream {
     let mut ts = TokenStream::new();
@@ -95,11 +18,7 @@ fn extract_generic_type_params_idents(generics: &Generics) -> TokenStream {
     ts
 }
 
-pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Error> {
-    let Some(global_id) = &args.global_id else {
-        return Err(Error::new(args.end_span, "global_id must be set"));
-    };
-
+pub fn expand_trait(item: &mut ItemTrait, _args: Args) -> Result<TokenStream, Error> {
     if let Some(first_const_param) = item.generics.const_params().next() {
         return Err(Error::new(
             first_const_param.span(),
@@ -142,10 +61,6 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
         #trait_ident #generics_lt #generics_params_pass #generics_gt
     );
 
-    let has_generics = !item.generics.params.is_empty();
-
-    let inner_trait_ident = Ident::new(&format!("Inner{trait_ident}"), Span::call_site());
-
     let dyncast_provider = format!("{}DyncastProvider", &item.ident);
     let dyncast_provider = Ident::new(
         &dyncast_provider,
@@ -154,79 +69,13 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
     let dyncast_provider_with_params =
         quote!(#dyncast_provider #generics_lt #generics_params_pass #generics_gt);
 
-    let section_name_args = SectionNameArgs {
-        name: trait_ident,
-        global_id,
-        seed: args.seed,
-    };
-
-    let descriptor_entry = generate_asm_sections(
-        section_name_args,
-        AsmSectionKind::DyncastDescriptorSymbol,
-        false,
-    );
-    let empty_descriptor_entry =
-        generate_asm_sections(section_name_args, AsmSectionKind::ZeroData, true);
-
-    let elf_section_start = linker::elf::section_start(section_name_args);
-    let elf_section_stop = linker::elf::section_stop(section_name_args);
-
-    let macho_section_start = linker::macho::section_start(section_name_args);
-    let macho_section_stop = linker::macho::section_stop(section_name_args);
-
-    let generics_type_id = if has_generics {
-        quote! {
-            let __generics_type_id = Some(
-                ::dyncast::private::TypeId::of::<(#generics_params_pass)>()
-            );
-        }
-    } else {
-        quote! {
-            let __generics_type_id = None;
-        }
-    };
-
-    let make_dyncast_descriptor = if has_generics {
-        quote! {
-            ::dyncast::private::Descriptor::new_generics(
-                ::std::any::TypeId::of::<Self>(),
-                ::std::any::TypeId::of::<(#generics_params_pass)>(),
-                Self::dyncast_attach_vtable
-            )
-        }
-    } else {
-        quote! {
-            ::dyncast::private::Descriptor::new(
-                ::std::any::TypeId::of::<Self>(),
-                Self::dyncast_attach_vtable
-            )
-        }
-    };
-
-    let make_map = if has_generics {
-        quote! {
-            trait #inner_trait_ident: 'static {}
-            let __lazy = unsafe {
-                ::dyncast::private::LazyTypeMap::<dyn #inner_trait_ident>::current()
-            };
-            let __map = unsafe { __lazy.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
-        }
-    } else {
-        quote! {
-            trait #inner_trait_ident: 'static {}
-            static __LAZY_MAP: ::dyncast::private::LazyTypeMap::<dyn #inner_trait_ident> =
-                ::dyncast::private::LazyTypeMap::new();
-            let __map = unsafe { __LAZY_MAP.get_or_init(&DYNCAST_START, &DYNCAST_STOP) };
-        }
-    };
-
     let dyncast_descriptor_ref = quote! {
         #[doc(hidden)]
-        unsafe fn __dyncast_descriptor_ref()
+        unsafe fn __dyncast_descriptor_ref() -> ::dyncast::private::Descriptor
         where
             Self: 'static + ::std::marker::Sized + #dyncast_provider_with_params
         {
-            let _ = <Self as #dyncast_provider_with_params>::dyncast_descriptor();
+            <Self as #dyncast_provider_with_params>::dyncast_descriptor()
         }
     };
     let dyncast_descriptor_ref = syn::parse2::<TraitItem>(dyncast_descriptor_ref).unwrap();
@@ -234,17 +83,23 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
     item.items.push(dyncast_descriptor_ref);
 
     Ok(quote! {
+        /// # Safety
+        /// This trait must *not* be implemented on any type manually. Doing so might cause UB.
         #[doc(hidden)]
         unsafe trait #dyncast_provider #generics_lt #generics_params #generics_gt : #trait_ident_with_params
         #generics_where
         {
+            #[inline(always)]
             fn dyncast_descriptor() -> ::dyncast::private::Descriptor
             where
                 Self: 'static + ::std::marker::Sized,
             {
                 unsafe {
-                    #descriptor_entry
-                    #make_dyncast_descriptor
+                    ::dyncast::private::Descriptor::new(
+                        ::std::any::TypeId::of::<Self>(),
+                        ::std::any::TypeId::of::<dyn #trait_ident_with_params>(),
+                        Self::dyncast_attach_vtable
+                    )
                 }
             }
 
@@ -275,41 +130,19 @@ pub fn expand_trait(item: &mut ItemTrait, args: Args) -> Result<TokenStream, Err
             ) -> ::std::option::Option<&Self> {
                 use ::std::any::Any;
 
-                #[cfg(any(
-                    target_os = "none",
-                    target_os = "linux",
-                    target_os = "freebsd",
-                    target_os = "macos",
-                    target_os = "ios",
-                    target_os = "tvos",
-                ))]
-                extern "Rust" {
-                    #[cfg_attr(any(target_os = "none", target_os = "linux", target_os = "freebsd"), link_name = #elf_section_start)]
-                    #[cfg_attr(any(target_os = "macos", target_os = "ios", target_os = "tvos"), link_name = #macho_section_start)]
-                    static DYNCAST_START: *const ();
-
-                    #[cfg_attr(any(target_os = "none", target_os = "linux", target_os = "freebsd"), link_name = #elf_section_stop)]
-                    #[cfg_attr(any(target_os = "macos", target_os = "ios", target_os = "tvos"), link_name = #macho_section_stop)]
-                    static DYNCAST_STOP: *const ();
-                }
-
-                #generics_type_id
-
-                #make_map
-
-                let __key = ::dyncast::private::Key {
-                    self_type_id: __source.type_id(),
-                    generics_type_id: __generics_type_id,
+                let __map = unsafe {
+                    ::dyncast::private::LazyTypeMap::<
+                        dyn #trait_ident_with_params
+                    >::current().get_or_init()
                 };
-                let __descriptor = __map.get(&__key)?;
+
+                let __descriptor = __map.get(::std::any::Any::type_id(__source))?;
 
                 Some(unsafe {
                     &*(__descriptor.attach_vtable_fn())(__source as *const _ as *const ())
                 })
             }
         }
-
-        #empty_descriptor_entry
     })
 }
 
@@ -349,10 +182,28 @@ pub fn expand_impl(item: &ItemImpl, _args: Args) -> Result<TokenStream, Error> {
     };
     let self_ty = &*item.self_ty;
 
+    let elf_section = linker::elf::SECTION;
+    let macho_section = linker::macho::SECTION;
+    let windows_section = linker::windows::SECTION;
+
     Ok(quote! {
         const _: () = {
+            #[cfg_attr(
+                any(target_os = "macos", target_os = "ios", target_os = "tvos"),
+                link_section = #macho_section
+            )]
+            #[cfg_attr(
+                any(target_os = "none", target_os = "linux", target_os = "freebsd"),
+                link_section = #elf_section
+            )]
+            #[cfg_attr(
+                target_os = "windows",
+                link_section = #windows_section
+            )]
             #[used]
-            static REF_DYNCAST: unsafe fn() = <#self_ty as #trait_path>::__dyncast_descriptor_ref;
+            static REF_DYNCAST: ::dyncast::private::Entry = ::dyncast::private::Entry::new(
+                <#self_ty as #trait_path>::__dyncast_descriptor_ref
+            );
         };
     })
 }

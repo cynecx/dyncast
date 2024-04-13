@@ -5,7 +5,7 @@ use std::any::Any;
 /// ```
 /// use dyncast::dyncast;
 ///
-/// #[dyncast(global_id = "test1::Foo")]
+/// #[dyncast]
 /// trait Foo {}
 ///
 /// #[dyncast]
@@ -19,7 +19,7 @@ use std::any::Any;
 /// ```
 /// use dyncast::dyncast;
 ///
-/// #[dyncast(global_id = "test2::Foo")]
+/// #[dyncast]
 /// trait Foo<T: 'static> {}
 ///
 /// #[dyncast]
@@ -33,6 +33,7 @@ pub use dyncast_impl::dyncast;
 pub mod private;
 
 mod generic_statics;
+mod global;
 mod map;
 mod once;
 mod ptr;
@@ -46,7 +47,7 @@ pub trait Dyncast: Any {
 /// ```
 /// use dyncast::{dyncast, DyncastExt};
 ///
-/// #[dyncast(global_id = "universe::Bar")]
+/// #[dyncast]
 /// trait Bar {}
 ///
 /// fn foo(val: &dyn std::any::Any) {

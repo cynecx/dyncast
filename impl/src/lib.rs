@@ -4,7 +4,7 @@ use syn::parse_macro_input;
 
 mod args;
 mod dyncast;
-mod hash;
+// mod hash;
 mod linker;
 mod parse;
 

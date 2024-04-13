@@ -2,7 +2,7 @@ use std::any::Any;
 
 use dyncast::{dyncast, DyncastExt};
 
-#[dyncast(global_id = "basic::Boba")]
+#[dyncast]
 trait Boba {
     fn supper(&self) -> &'static str;
 }
@@ -25,7 +25,7 @@ impl Boba for B {
     }
 }
 
-#[dyncast(global_id = "basic::Soba")]
+#[dyncast]
 trait Soba {}
 
 #[dyncast]
