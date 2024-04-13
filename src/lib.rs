@@ -1,3 +1,41 @@
+//! ## dyncast
+//!
+//! [![github]](https://github.com/cynecx/dyncast) [![crates-io]](https://crates.io/crates/dyncast)
+//!
+//! [github]: https://img.shields.io/badge/github-cynecx/dyncast-blue?logo=github
+//! [crates-io]: https://img.shields.io/crates/v/dyncast.svg?logo=rust
+//!
+//! **Fair warning**: This crate is a **proof of concept**. The soundness of this crate has **not** been validated. **Use at your own risk**.
+//!
+//! This library provides opt-in type downcasting to `dyn Trait`s.
+//!
+//! The entrypoint for this library is the [`dyncast`] proc-macro, which should be applied on every `trait` and `impl`, you'd want to enable downcasting to. The proc-macro will additionally implement [`Dyncast`] for the selected trait (`dyn Trait`), which can be used to check whether a concrete type implements such trait.
+//!
+//! ### Example
+//!
+//! ```rust
+//! use std::any::Any;
+//!
+//! use dyncast::{dyncast, DyncastExt};
+//!
+//! #[dyncast]
+//! trait Foo {
+//!     fn bar(&self);
+//! }
+//!
+//! #[dyncast]
+//! impl Foo for () {
+//!     fn bar(&self) {
+//!         println!("a")
+//!     }
+//! }
+//!
+//! #[test]
+//! fn boba() {
+//!     let a = &() as &dyn Any;
+//!     assert!(a.dyncast_to::<dyn Foo>().is_some());
+//! }
+//! ```
 use std::any::Any;
 
 /// [This](`dyncast`) proc-macro can be used on trait definitions and trait impls.
